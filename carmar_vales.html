@@ -260,7 +260,8 @@ td{padding:11px 14px;font-size:13px}
         </div>
       </div>
       <div class="fr">
-        <div class="fg"><label>Buscar cliente</label><input id="fCliente" oninput="renderVales()" placeholder="Nombre…"></div>
+        <div class="fg"><label>Buscar cliente / N° vale</label><input id="fCliente" oninput="renderVales()" placeholder="Nombre o V-2026-…"></div>
+        <div class="fg"><label>N° Factura</label><input id="fFactura" oninput="renderVales()" placeholder="Factura asociada…"></div>
         <div class="fg"><label>Estado</label>
           <select id="fEstado" onchange="renderVales()">
             <option value="">Todos</option>
@@ -268,15 +269,17 @@ td{padding:11px 14px;font-size:13px}
             <option value="autorizado">Autorizado</option>
             <option value="parcialmente_usado">Parcial</option>
             <option value="utilizado">Utilizado</option>
+            <option value="en_entrega">En entrega</option>
+            <option value="completado">Completado</option>
+            <option value="cerrado">Cerrado</option>
             <option value="anulado">Anulado</option>
           </select>
         </div>
         <div class="fg"><label>Tipo</label>
           <select id="fTipo" onchange="renderVales()">
             <option value="">Todos</option>
+            <option value="mercaderia">Mercadería</option>
             <option value="dinero">Vale por Dinero</option>
-            <option value="material_cc">Mercadería C/Cte</option>
-            <option value="material_contado">Mercadería Contado</option>
           </select>
         </div>
         <div class="fg"><label>Fecha desde</label><input type="date" id="fFecha" onchange="renderVales()"></div>
@@ -291,21 +294,16 @@ td{padding:11px 14px;font-size:13px}
         <!-- STEP 1: Tipo -->
         <div id="step1">
           <div class="ct">1. Seleccionar tipo de vale</div>
-          <div class="tgrid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="tgrid" style="grid-template-columns:repeat(2,1fr)">
             <div class="tc" onclick="selTipo('dinero',this)">
               <div class="ti">💵</div>
               <div class="tn">Vale por Dinero</div>
               <div class="td">Devolución, N/C, cheque o diferencia de pago (mín. $10.000)</div>
             </div>
-            <div class="tc" onclick="selTipo('material_cc',this)">
-              <div class="ti">📄</div>
-              <div class="tn">Material C/Cte</div>
-              <div class="td">Stock pendiente — cliente necesita factura</div>
-            </div>
-            <div class="tc" onclick="selTipo('material_contado',this)">
+            <div class="tc" onclick="selTipo('mercaderia',this)">
               <div class="ti">📦</div>
-              <div class="tn">Material Contado</div>
-              <div class="td">Pagó pero falta stock para entregar</div>
+              <div class="tn">Vale por Mercadería</div>
+              <div class="td">Artículos pendientes de entrega — Contado o C/Cte</div>
             </div>
           </div>
         </div>
@@ -327,7 +325,17 @@ td{padding:11px 14px;font-size:13px}
                 <option value="cuenta_corriente">Cuenta Corriente</option>
               </select>
             </div>
-            <div class="fg" id="fgFactura" style="display:none"><label>Factura asociada</label><input id="fvFactura" placeholder="N° de factura"></div>
+            <div class="fg" id="fgFactura" style="display:none"><label>Factura asociada *</label><input id="fvFactura" placeholder="N° de factura"></div>
+          </div>
+          <div class="fg2" id="bloqDeposito" style="display:none">
+            <div class="fg"><label>Depósito principal (opcional)</label>
+              <select id="fvDeposito">
+                <option value="">-- Sin preferencia --</option>
+                <option value="Depósito 1">Depósito 1</option>
+                <option value="Depósito 4">Depósito 4</option>
+              </select>
+            </div>
+            <div class="fg"><div class="al al-i" style="font-size:11px;margin-top:18px">El depósito se confirma artículo por artículo al registrar cada entrega.</div></div>
           </div>
           <!-- IMPORTE / CAMPOS ESPECIALES -->
           <div class="div" style="margin:12px 0"></div>
@@ -513,6 +521,56 @@ td{padding:11px 14px;font-size:13px}
   </div>
 </div>
 
+<!-- ENTREGA MERCADERÍA -->
+<div class="mo" id="moEntrega">
+  <div class="md md-lg">
+    <div class="mt">📦 Registrar Entrega</div>
+    <div id="entregaInfo" style="margin-bottom:14px"></div>
+    <div id="bloqContraPagoConf" class="al al-w" style="display:none;margin-bottom:14px">
+      <b>⚠ ENTREGA CONTRA PAGO</b> — Este vale requiere confirmación de pago antes de entregar.
+      <div style="margin-top:10px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;text-transform:none;letter-spacing:0">
+          <input type="checkbox" id="chkPagoConf" style="width:18px;height:18px">
+          Confirmo que el pago fue <b>acreditado</b> y verificado
+        </label>
+      </div>
+      <div class="fg" style="margin-top:10px;margin-bottom:0">
+        <label>Clave de autorización *</label>
+        <input type="password" id="claveContraPago" placeholder="Clave secreta para confirmar pago">
+      </div>
+    </div>
+    <div id="entregaRows" style="margin-bottom:14px"></div>
+    <div class="fg"><label>Descripción de la entrega *</label><input id="entregaDesc" placeholder="Ej: Entrega parcial — retira en depósito 1"></div>
+    <div id="entregaErr" class="al al-r" style="display:none"></div>
+    <div class="mf">
+      <button class="btn btn-o" onclick="closeModal('moEntrega')">Cancelar</button>
+      <button class="btn btn-g" onclick="confirmarEntrega()">✔ Confirmar entrega</button>
+    </div>
+  </div>
+</div>
+
+<!-- CERRAR SIN RETIRO -->
+<div class="mo" id="moCerrarSinRetiro">
+  <div class="md">
+    <div class="mt">🔒 Cerrar vale sin retiro completo</div>
+    <div class="al al-w">El vale quedará <b>CERRADO</b>. Los artículos pendientes no podrán retirarse más.</div>
+    <div class="fg" style="margin-top:12px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:13px;font-weight:500;color:var(--text)">
+        <input type="checkbox" id="cerrarGenDinero" style="width:auto">
+        Generar vale por dinero por el saldo de artículos no retirados
+      </label>
+    </div>
+    <div class="fg"><label>Clave de autorización *</label><input type="password" id="cerrarClave" placeholder="Clave secreta"></div>
+    <div class="fg"><label>Autorizado por *</label><input id="cerrarNombre" placeholder="Nombre de quien autoriza"></div>
+    <div class="fg"><label>Motivo *</label><textarea id="cerrarMotivo" placeholder="Motivo del cierre sin retiro…"></textarea></div>
+    <div id="cerrarErr" class="al al-r" style="display:none"></div>
+    <div class="mf">
+      <button class="btn btn-o" onclick="closeModal('moCerrarSinRetiro')">Cancelar</button>
+      <button class="btn btn-r" onclick="confirmarCerrarSinRetiro()">Cerrar definitivamente</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="tc-wrap" id="toasts"></div>
 
@@ -528,9 +586,21 @@ const DEF_USERS=[
 ];
 const DEF_AUTH='AUTH2026';
 
-// localStorage helpers (para users, auth, catálogo — datos locales)
+// localStorage helpers
 function load(k,def){try{const v=localStorage.getItem(k);return v?JSON.parse(v):def}catch{return def}}
 function save(k,v){localStorage.setItem(k,JSON.stringify(v))}
+
+// ===== VARIABLES (declaradas ANTES de Firebase) =====
+let appUsers=load('cm_users',DEF_USERS);
+let authCode=load('cm_auth',DEF_AUTH);
+let vales=[];
+let catalogo=load('cm_catalogo',[]);
+let unsubscribe=null;
+let currentUser=null;
+let currentValeId=null;
+let selectedTipo=null;
+let artCount=0;
+let actionValeId=null;
 
 // ===== FIREBASE INIT =====
 const firebaseConfig = {
@@ -545,12 +615,6 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const valesRef  = db.collection('vales');
 const configRef = db.collection('config');
-
-let users=load('cm_users',DEF_USERS);
-let authCode=load('cm_auth',DEF_AUTH);
-let vales=[];
-let catalogo=load('cm_catalogo',[]);
-let unsubscribe=null; // listener en tiempo real
 
 // Escuchar vales en tiempo real desde Firebase
 function setConn(ok){
@@ -589,7 +653,7 @@ async function saveVale(vale){
   }
 }
 async function fbGuardarConfig(){
-  try{await configRef.doc('sistema').set({authCode,users});}
+  try{await configRef.doc('sistema').set({authCode,appUsers});}
   catch(e){console.error('Error config Firebase:',e);}
 }
 async function fbGuardarCatalogo(){
@@ -597,17 +661,11 @@ async function fbGuardarCatalogo(){
   catch(e){console.error('Error catálogo Firebase:',e);}
 }
 
-let currentUser=null;
-let currentValeId=null;
-let selectedTipo=null;
-let artCount=0;
-let actionValeId=null;
-
 // ===== AUTH =====
 function doLogin(){
   const u=document.getElementById('liUser').value.trim();
   const p=document.getElementById('liPass').value.trim();
-  const found=users.find(x=>x.username===u&&x.password===p);
+  const found=appUsers.find(x=>x.username===u&&x.password===p);
   if(!found){showErr('loginErr','Usuario o contraseña incorrectos');return}
   currentUser=found;
   document.getElementById('loginScreen').style.display='none';
@@ -654,13 +712,15 @@ function selTipo(tipo,el){
 function setupTipoFields(tipo){
   const titles={
     dinero:'Vale por Dinero',
-    material_cc:'Vale por Mercadería — C/Cte',
-    material_contado:'Vale por Mercadería — Contado'
+    mercaderia:'Vale por Mercadería',
+    // legacy
+    material_cc:'Mercadería C/Cte (legacy)',
+    material_contado:'Mercadería Contado (legacy)'
   };
-  document.getElementById('step2Title').textContent='2. Datos del vale: '+titles[tipo];
+  document.getElementById('step2Title').textContent='2. Datos del vale: '+(titles[tipo]||tipo);
   // Reset bloques
-  ['bloqNC','bloqCheque','bloqArticulos','bloqContraPago','bloqDevolucion','fgFactura'].forEach(id=>{
-    document.getElementById(id).style.display='none';
+  ['bloqNC','bloqCheque','bloqArticulos','bloqContraPago','bloqDevolucion','fgFactura','bloqDeposito'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.style.display='none';
   });
   const al=document.getElementById('tipoAlert');
   al.style.display='none';
@@ -676,18 +736,17 @@ function setupTipoFields(tipo){
     al.className='al al-i';
     al.innerHTML='Monto mínimo <b>$10.000</b>. Completá el comprobante de referencia y el motivo en Descripción.';
     al.style.display='block';
-  } else if(tipo==='material_cc'){
+  } else if(tipo==='mercaderia'){
     document.getElementById('bloqArticulos').style.display='block';
     document.getElementById('bloqContraPago').style.display='block';
     document.getElementById('fgFactura').style.display='block';
-    document.getElementById('fvCondicion').value='cuenta_corriente';
-    al.className='al al-i';al.innerHTML='<b>C/Cte:</b> Solo emitir cuando no hay stock y el cliente necesita la factura para gestionar el pago.';al.style.display='block';
-    fgI.style.display='none';
-    artCount=0;document.getElementById('artRows').innerHTML='';addArt();
-  } else if(tipo==='material_contado'){
-    document.getElementById('bloqArticulos').style.display='block';
-    document.getElementById('fvCondicion').value='contado';
-    al.className='al al-i';al.innerHTML='<b>Contado:</b> El cliente ya pagó. El vale representa la mercadería pendiente de entrega.';al.style.display='block';
+    const facLabel=document.querySelector('#fgFactura label');
+    if(facLabel)facLabel.textContent='Factura asociada *';
+    document.getElementById('fvFactura').placeholder='N° de factura (obligatorio)';
+    document.getElementById('bloqDeposito').style.display='block';
+    al.className='al al-i';
+    al.innerHTML='Completá <b>todos los campos obligatorios</b>: factura, depósito y al menos un artículo.';
+    al.style.display='block';
     fgI.style.display='none';
     artCount=0;document.getElementById('artRows').innerHTML='';addArt();
   }
@@ -830,13 +889,25 @@ async function crearVale(){
   let articulos=[];
   let extra={};
 
-  if(selectedTipo==='material_cc'||selectedTipo==='material_contado'){
+  if(selectedTipo==='mercaderia'){
+    if(!factura){toast('La factura asociada es obligatoria','warn');return}
+    const dep=document.getElementById('fvDeposito').value;
+    // dep es opcional en la creación — se elige por artículo en cada entrega
     articulos=getArticulos();
     if(!articulos.length){toast('Agregá al menos un artículo','warn');return}
+    // Agregar cantPendiente y cantEntregada a cada artículo
+    articulos=articulos.map(a=>({...a,cantPendiente:a.cant,cantEntregada:0}));
     importe=articulos.reduce((s,a)=>s+a.total,0);
-    if(selectedTipo==='material_cc'){
-      extra.contraPago=document.getElementById('fvContraPago').checked;
-    }
+    extra.contraPago=document.getElementById('fvContraPago').checked;
+    extra.deposito=dep;
+    if(!desc){toast('Agregá una descripción','warn');return}
+  } else if(selectedTipo==='material_cc'||selectedTipo==='material_contado'){
+    // Legacy: mantener compatibilidad
+    articulos=getArticulos();
+    if(!articulos.length){toast('Agregá al menos un artículo','warn');return}
+    articulos=articulos.map(a=>({...a,cantPendiente:a.cant,cantEntregada:0}));
+    importe=articulos.reduce((s,a)=>s+a.total,0);
+    extra.contraPago=document.getElementById('fvContraPago')?.checked||false;
     if(!desc){toast('Agregá una descripción','warn');return}
   } else if(selectedTipo==='dinero_nc'){
     const nc=parseFloat(document.getElementById('fvNC').value)||0;
@@ -896,6 +967,7 @@ function resetForm(){
   });
   document.getElementById('fvCondicion').value='contado';
   document.getElementById('fvContraPago').checked=false;
+  const depEl=document.getElementById('fvDeposito');if(depEl)depEl.value='';
   artCount=0;document.getElementById('artRows').innerHTML='';
   document.getElementById('ncResult').style.display='none';
   navTo(document.getElementById('nbNuevo'));
@@ -918,7 +990,7 @@ function buildDetalle(v){
   const tb=tipoBadge(v.tipo);
   const pct=v.importe>0?Math.round((v.saldo/v.importe)*100):0;
   const canAuth=v.estado==='pendiente';
-  const canUsar=v.estado==='autorizado'||v.estado==='parcialmente_usado';
+  const canUsar=v.estado==='autorizado'||v.estado==='parcialmente_usado'||v.estado==='en_entrega';
   const canAnul=v.estado!=='anulado'&&v.estado!=='utilizado';
   const isAdmin=currentUser.rol==='administracion';
   let html=`
@@ -929,7 +1001,9 @@ function buildDetalle(v){
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       ${canAuth?`<button class="btn btn-g btn-sm" onclick="openAutorizar('${v.id}')">🔐 Autorizar</button>`:''}
-      ${canUsar?`<button class="btn btn-p btn-sm" onclick="openUsar('${v.id}')">💳 Registrar uso</button>`:''}
+      ${(canUsar&&(v.tipo!=='mercaderia'&&!v.tipo.startsWith('material')))?`<button class="btn btn-p btn-sm" onclick="openUsar('${v.id}')">💳 Registrar uso</button>`:''}
+      ${(canUsar&&(v.tipo==='mercaderia'||v.tipo.startsWith('material')))?`<button class="btn btn-g btn-sm" onclick="openEntrega('${v.id}')">📦 Registrar entrega</button>`:''}
+      ${(canUsar&&(v.tipo==='mercaderia'||v.tipo.startsWith('material'))&&isAdmin)?`<button class="btn btn-r btn-sm" onclick="openCerrarSinRetiro('${v.id}')">🔒 Cerrar sin retiro</button>`:''}
       <button class="btn btn-n btn-sm" onclick="openComp('${v.id}')">🖨 Comprobante</button>
       <button class="btn btn-wa btn-sm" onclick="sendWA('${v.id}')">📲 WhatsApp</button>
       ${canAnul&&isAdmin?`<button class="btn btn-r btn-sm" onclick="openAnular('${v.id}')">🚫 Anular</button>`:''}
@@ -944,7 +1018,7 @@ function buildDetalle(v){
   <div id="panel-info">`:``}`;
 
   // saldo
-  if(v.tipo!=='material_cc'&&v.tipo!=='material_contado'){
+  if(v.tipo!=='mercaderia'&&v.tipo!=='material_cc'&&v.tipo!=='material_contado'){
     html+=`<div class="saldo-box">
       <div>
         <div class="saldo-lbl">Saldo disponible</div>
@@ -960,14 +1034,19 @@ function buildDetalle(v){
       </div>
     </div>`;
   } else {
+    const pendCount=(v.articulos||[]).filter(a=>a.cantPendiente>0).length;
+    const totalPend=(v.articulos||[]).reduce((s,a)=>s+(a.cantPendiente||a.cant||0),0);
     html+=`<div class="saldo-box">
       <div>
-        <div class="saldo-lbl">Vale por material</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:700;color:var(--orange)">${v.articulos.length} artículo(s) pendiente(s)</div>
+        <div class="saldo-lbl">Artículos pendientes de entrega</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:700;color:var(--orange)">${pendCount} artículo(s) — ${totalPend} unidades</div>
+        ${v.extra&&v.extra.contraPago?'<div style="margin-top:8px;background:#f97316;color:white;padding:4px 12px;border-radius:20px;font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:700;display:inline-block;text-transform:uppercase;letter-spacing:1px">⚠ ENTREGA CONTRA PAGO</div>':''}
       </div>
       <div style="text-align:right">
-        <div class="saldo-lbl">Valor estimado</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:600;opacity:.9">$${fmt(v.importe)}</div>
+        <div class="saldo-lbl">Depósito</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:600;opacity:.9">${(v.extra&&v.extra.deposito)||'—'}</div>
+        <div class="saldo-lbl" style="margin-top:8px">Valor estimado</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:600;opacity:.9">$${fmt(v.importe)}</div>
       </div>
     </div>`;
   }
@@ -980,7 +1059,8 @@ function buildDetalle(v){
     <div><div class="il">Tipo</div><div class="iv">${tipoLabel(v.tipo)}</div></div>
     <div><div class="il">Creado el</div><div class="iv">${fmtDate(v.fechaCreacion)}</div></div>
     <div><div class="il">Creado por</div><div class="iv">${v.creadoPor}</div></div>
-    ${v.facturaAsociada?`<div><div class="il">Referencia</div><div class="iv">${v.facturaAsociada}</div></div>`:''}
+    ${v.facturaAsociada?`<div><div class="il">Factura / Referencia</div><div class="iv">${v.facturaAsociada}</div></div>`:''}
+    ${v.extra&&v.extra.deposito?`<div><div class="il">Depósito</div><div class="iv">${v.extra.deposito}</div></div>`:''}
     ${v.fechaAutorizacion?`<div><div class="il">Autorizado el</div><div class="iv">${fmtDate(v.fechaAutorizacion)}</div></div>`:''}
     ${v.autorizadoPor?`<div><div class="il">Autorizado por</div><div class="iv">${v.autorizadoPor}</div></div>`:''}
   </div>`;
@@ -994,14 +1074,65 @@ function buildDetalle(v){
 
   // articulos si hay
   if(v.articulos&&v.articulos.length){
-    html+=`<div class="card" style="margin-bottom:16px">
-      <div class="ct" style="font-size:14px">Artículos del vale</div>
-      <div class="tw"><table>
-        <thead><tr><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Precio unit.</th><th>Total</th></tr></thead>
-        <tbody>${v.articulos.map(a=>`<tr><td style="font-family:'Barlow Condensed',sans-serif;font-weight:700">${a.cod||'—'}</td><td>${a.desc}</td><td>${a.cant}</td><td>$${fmt(a.precio)}</td><td>$${fmt(a.total)}</td></tr>`).join('')}</tbody>
-        <tfoot><tr><td colspan="3" style="font-weight:600;text-align:right;padding:10px 14px">Total estimado:</td><td style="font-weight:700;font-size:15px">$${fmt(v.importe)}</td></tr></tfoot>
-      </table></div>
-    </div>`;
+    const esMerc=v.tipo==='mercaderia'||v.tipo.startsWith('material');
+    if(esMerc){
+      const totalArts=(v.articulos||[]).length;
+      const artsPend=(v.articulos||[]).filter(a=>(a.cantPendiente!==undefined?a.cantPendiente:a.cant)>0).length;
+      const artsOk=totalArts-artsPend;
+      html+=`<div class="card" style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+          <div class="ct" style="margin-bottom:0">📦 Estado de artículos</div>
+          <div style="display:flex;gap:8px">
+            <span style="background:#dcfce7;color:#166534;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700">${artsOk}/${totalArts} entregados</span>
+            ${artsPend>0?`<span style="background:#fef3c7;color:#92400e;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700">${artsPend} pendientes</span>`:'<span style="background:#dcfce7;color:#166534;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700">✅ COMPLETO</span>'}
+          </div>
+        </div>
+        <div class="tw"><table>
+          <thead><tr>
+            <th>Código</th>
+            <th>Descripción</th>
+            <th style="text-align:center">Original</th>
+            <th style="text-align:center;background:#166534">Entregado</th>
+            <th style="text-align:center;background:#92400e">Pendiente</th>
+            <th style="text-align:center">Estado</th>
+          </tr></thead>
+          <tbody>${v.articulos.map(a=>{
+            const orig=a.cant;
+            const entr=a.cantEntregada||0;
+            const pend=a.cantPendiente!==undefined?a.cantPendiente:(orig-entr);
+            const pct=orig>0?Math.round((entr/orig)*100):0;
+            const completo=pend<=0;
+            return `<tr style="background:${completo?'#f0fdf4':'white'}">
+              <td style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px">${a.cod||'—'}</td>
+              <td style="font-size:13px;font-weight:500">${a.desc}</td>
+              <td style="text-align:center;font-weight:600">${orig}</td>
+              <td style="text-align:center;font-weight:700;color:var(--green);font-size:15px">${entr||'—'}</td>
+              <td style="text-align:center;font-weight:700;font-size:15px;color:${completo?'var(--green)':'var(--orange)'}">${completo?'—':pend}</td>
+              <td style="text-align:center">
+                ${completo
+                  ?'<span style="background:#dcfce7;color:#166534;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700">✓ OK</span>'
+                  :entr>0
+                    ?'<span style="background:#fef3c7;color:#92400e;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700">PARCIAL</span>'
+                    :'<span style="background:#fee2e2;color:#991b1b;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700">PENDIENTE</span>'
+                }
+                <div style="background:#e2d9d0;border-radius:4px;height:4px;margin-top:4px;overflow:hidden">
+                  <div style="height:100%;width:${pct}%;background:var(--green);transition:width .4s"></div>
+                </div>
+              </td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table></div>
+      </div>`;
+    } else {
+      html+=`<div class="card" style="margin-bottom:16px">
+        <div class="ct" style="font-size:14px">Artículos del vale</div>
+        <div class="tw"><table>
+          <thead><tr><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Precio unit.</th><th>Total</th></tr></thead>
+          <tbody>${v.articulos.map(a=>`<tr><td style="font-family:'Barlow Condensed',sans-serif;font-weight:700">${a.cod||'—'}</td><td>${a.desc}</td><td>${a.cant}</td><td>$${fmt(a.precio)}</td><td>$${fmt(a.total)}</td></tr>`).join('')}</tbody>
+          <tfoot><tr><td colspan="3" style="font-weight:600;text-align:right;padding:10px 14px">Total estimado:</td><td style="font-weight:700;font-size:15px">$${fmt(v.importe)}</td></tr></tfoot>
+        </table></div>
+      </div>`;
+    }
   }
 
   // cheque extra
@@ -1020,11 +1151,14 @@ function buildDetalle(v){
     <div class="ct" style="font-size:14px">Historial de movimientos</div>
     ${v.historial.map(h=>`
       <div class="hi">
-        <div class="hd"></div>
-        <div>
-          <div class="ha">${h.accion}${h.importeUsado?` — $${fmt(h.importeUsado)}`:''}</div>
-          <div class="hm">${fmtDate(h.fecha)} · ${h.usuario}${h.saldo!==undefined?` · Saldo: $${fmt(h.saldo)}`:''}</div>
-          ${h.desc?`<div class="hm" style="font-style:italic">${h.desc}</div>`:''}
+        <div class="hd" style="background:${h.tipo==='entrega'?'var(--green)':'var(--orange)'}"></div>
+        <div style="flex:1">
+          <div class="ha">${h.cpId?`<span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--orange);font-size:15px">${h.cpId}</span> — `:''}${h.accion}${h.importeUsado?` — $${fmt(h.importeUsado)}`:''}</div>
+          <div class="hm">${fmtDate(h.fecha)} · ${h.usuario}${h.saldo!==undefined&&h.tipo!=='entrega'?` · Saldo: $${fmt(h.saldo)}`:''}</div>
+          ${h.desc?`<div class="hm" style="font-style:italic;margin-top:2px">${h.desc}</div>`:''}
+          ${h.articulos&&h.articulos.length?`<div style="margin-top:6px;padding:6px 10px;background:var(--bg);border-radius:6px;font-size:11px">
+            ${h.articulos.map(a=>`<span style="display:inline-block;background:white;border:1px solid var(--border);border-radius:4px;padding:2px 8px;margin:2px;font-weight:600">${a.cod?a.cod+' · ':''}${a.desc} × <b style="color:var(--green)">${a.cantEntregada}</b> → ${a.deposito||''}</span>`).join('')}
+          </div>`:''}
         </div>
       </div>`).join('')}
   </div>`;
@@ -1050,7 +1184,7 @@ function switchTab(tab){
 
 function buildPanelUsos(v){
   const usos=(v.historial||[]).filter(h=>h.importeUsado);
-  const canUsar=v.estado==='autorizado'||v.estado==='parcialmente_usado';
+  const canUsar=v.estado==='autorizado'||v.estado==='parcialmente_usado'||v.estado==='en_entrega';
   let h=`<div class="card" style="margin-bottom:16px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
       <div class="ct" style="margin-bottom:0">Comprobantes de uso</div>
@@ -1201,6 +1335,292 @@ function prtFirma(){
 <\/script>
 </body></html>`);
   pw.document.close();
+}
+
+// ===== ENTREGA MERCADERÍA =====
+function openEntrega(id){
+  actionValeId=id;
+  const v=vales.find(x=>x.id===id);if(!v)return;
+  const pendientes=(v.articulos||[]).filter(a=>(a.cantPendiente!==undefined?a.cantPendiente:a.cant)>0);
+  if(!pendientes.length){toast('No hay artículos pendientes de entrega','warn');return}
+
+  document.getElementById('entregaInfo').innerHTML=`
+    <div style="background:var(--bg);border-radius:var(--r);padding:12px;font-size:13px">
+      <b>${v.cliente.nombre}</b> · Factura: ${v.facturaAsociada||'—'} · Depósito: ${(v.extra&&v.extra.deposito)||'—'}
+      ${v.extra&&v.extra.contraPago?'<span style="margin-left:8px;background:var(--orange);color:white;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700">⚠ CONTRA PAGO</span>':''}
+    </div>`;
+
+  let rows='<div style="margin-bottom:10px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Artículos pendientes — marcá y completá cantidad a entregar:</div>';
+  pendientes.forEach((a,i)=>{
+    const pend=a.cantPendiente!==undefined?a.cantPendiente:a.cant;
+    rows+=`<div style="border:1.5px solid var(--border);border-radius:var(--r);padding:10px;margin-bottom:8px;background:${i%2?'white':'#faf8f6'}">
+      <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center">
+        <input type="checkbox" class="entr-chk" data-idx="${v.articulos.indexOf(a)}" id="chk_e_${i}" style="width:20px;height:20px;cursor:pointer" onchange="toggleEntregaRow(${i})">
+        <label for="chk_e_${i}" style="cursor:pointer;font-size:13px"><b>${a.cod?a.cod+' — ':'' }${a.desc}</b><br><span style="font-size:11px;color:var(--muted)">Pendiente: ${pend} u.</span></label>
+        <div>
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:3px">Cant. a entregar</label>
+          <input type="number" class="entr-cant" id="cant_e_${i}" data-max="${pend}" data-idx="${v.articulos.indexOf(a)}" value="${pend}" min="0.01" max="${pend}" step="0.01" style="width:90px;padding:6px 8px;border:1.5px solid var(--border);border-radius:var(--r);font-size:14px;font-weight:600;text-align:center" disabled>
+        </div>
+        <div style="font-size:12px;color:var(--muted);text-align:right">$${fmt(a.precio)}<br>c/u</div>
+      </div>
+      <div id="dep_row_${i}" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:4px">Depósito de entrega</label>
+        <select class="entr-dep" id="dep_e_${i}" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--r);font-size:13px;font-family:'Barlow',sans-serif">
+          <option value="Depósito 1" selected>Depósito 1</option>
+          <option value="Depósito 4">Depósito 4</option>
+        </select>
+      </div>
+    </div>`;
+  });
+  document.getElementById('entregaRows').innerHTML=rows;
+  document.getElementById('entregaDesc').value='';
+  document.getElementById('entregaErr').style.display='none';
+  // Mostrar bloque contra pago si aplica
+  const bloqCP=document.getElementById('bloqContraPagoConf');
+  const chkCP=document.getElementById('chkPagoConf');
+  const claveCP=document.getElementById('claveContraPago');
+  if(bloqCP){
+    const esContraPago=v.extra&&v.extra.contraPago;
+    bloqCP.style.display=esContraPago?'block':'none';
+    if(chkCP)chkCP.checked=false;
+    if(claveCP)claveCP.value='';
+  }
+  openModal('moEntrega');
+}
+
+function toggleEntregaRow(i){
+  const chk=document.getElementById('chk_e_'+i);
+  const cantInput=document.getElementById('cant_e_'+i);
+  if(cantInput)cantInput.disabled=!chk.checked;
+}
+
+async function confirmarEntrega(){
+  const v=vales.find(x=>x.id===actionValeId);if(!v)return;
+  const desc=document.getElementById('entregaDesc').value.trim();
+  if(!desc){showErr('entregaErr','Ingresá una descripción de la entrega');return}
+  // Validar contra pago
+  if(v.extra&&v.extra.contraPago){
+    const chkCP=document.getElementById('chkPagoConf');
+    const claveCP=document.getElementById('claveContraPago');
+    if(!chkCP||!chkCP.checked){showErr('entregaErr','Debés confirmar que el pago fue acreditado antes de entregar');return}
+    if(!claveCP||claveCP.value.trim()!==authCode){showErr('entregaErr','Clave de autorización incorrecta para confirmar el pago');return}
+  }
+
+  const chks=document.querySelectorAll('#moEntrega .entr-chk:checked');
+  if(!chks.length){showErr('entregaErr','Seleccioná al menos un artículo para entregar');return}
+
+  let entregados=[];
+  let error='';
+  const allChks=Array.from(document.querySelectorAll('#moEntrega .entr-chk'));
+  chks.forEach(chk=>{
+    const idx=parseInt(chk.dataset.idx);
+    const rowIdx=allChks.indexOf(chk);
+    const cantInput=document.getElementById('cant_e_'+rowIdx);
+    const depInput=document.getElementById('dep_e_'+rowIdx);
+    const cant=parseFloat(cantInput?cantInput.value:0)||0;
+    const dep=depInput?depInput.value:'';
+    const art=v.articulos[idx];
+    const pend=art.cantPendiente!==undefined?art.cantPendiente:art.cant;
+    if(cant<=0){error='La cantidad a entregar debe ser mayor a 0';return}
+    if(cant>pend){error=`Cantidad supera el pendiente de "${art.desc}" (máx: ${pend})`;return}
+    // dep siempre tiene valor (default Depósito 1)
+    entregados.push({idx,cant,dep,art});
+  });
+  if(error){showErr('entregaErr',error);return}
+
+  // Calcular número de CP
+  const nCP=String((v.historial||[]).filter(h=>h.tipo==='entrega').length+1).padStart(2,'0');
+  const cpId=`CP-${nCP}`;
+
+  // Actualizar artículos
+  entregados.forEach(({idx,cant})=>{
+    v.articulos[idx].cantEntregada=(v.articulos[idx].cantEntregada||0)+cant;
+    v.articulos[idx].cantPendiente=(v.articulos[idx].cantPendiente!==undefined?v.articulos[idx].cantPendiente:v.articulos[idx].cant)-cant;
+  });
+
+  // Verificar si todos los artículos fueron entregados
+  const todoEntregado=v.articulos.every(a=>(a.cantPendiente||0)<=0);
+  v.estado=todoEntregado?'completado':'en_entrega';
+
+  // Agregar al historial
+  v.historial.push({
+    fecha:new Date().toISOString(),
+    tipo:'entrega',
+    accion:`Entrega ${cpId}${todoEntregado?' — COMPLETA':'  — PARCIAL'}`,
+    usuario:currentUser.nombre,
+    cpId,
+    desc,
+    articulos:entregados.map(({art,cant,dep})=>({cod:art.cod,desc:art.desc,cantEntregada:cant,deposito:dep}))
+  });
+
+  try{
+    await saveVale(v);
+    closeModal('moEntrega');
+    toast(`${cpId} registrado. ${todoEntregado?'Vale COMPLETADO ✓':'Entrega parcial registrada.'}`,todoEntregado?'ok':'');
+    // Imprimir comprobante de entrega parcial
+    setTimeout(()=>imprimirEntregaCP(v,cpId,entregados.map(({art,cant,dep})=>({...art,cantEntregadaHoy:cant,deposito:dep})),desc),400);
+    verDetalle(actionValeId);
+    renderDash();renderVales();
+  }catch(err){
+    toast('Error: '+err.message,'err');
+  }
+}
+
+function imprimirEntregaCP(v,cpId,artEntregados,desc){
+  const pw=window.open('','_blank','width=680,height=900');
+  if(!pw)return;
+  const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  <title>${cpId} — ${v.id}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Barlow',sans-serif;padding:28px;color:#1e293b;font-size:13px}
+    .logo{font-family:'Barlow Condensed',sans-serif;font-size:38px;font-weight:800;color:#1a2744}
+    .logo span{color:#f97316}
+    .cp-num{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:700;color:#f97316}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:14px;border-bottom:2px solid #1a2744;margin-bottom:18px}
+    .sec-t{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:4px;border-bottom:1px solid #e2d9d0;padding-bottom:3px}
+    .sec{margin-bottom:14px}
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+    thead th{background:#1a2744;color:white;padding:8px 10px;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+    tbody td{padding:8px 10px;border-bottom:1px solid #e2d9d0}
+    .banner{background:#16a34a;color:white;padding:10px 18px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;margin:14px 0}
+    .banner-t{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;opacity:.9}
+    .contra-pago{background:#f97316;color:white;padding:6px 16px;border-radius:20px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;display:inline-block;margin:8px 0}
+    .sigs{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:28px}
+    .sig-left{border-top:1px solid #1e293b;padding-top:6px;text-align:center;font-size:11px;color:#64748b}
+    .cond{font-size:10px;color:#64748b;text-align:center;margin-top:14px;padding-top:10px;border-top:1px solid #e2d9d0;line-height:1.6}
+    canvas{border:1px solid #e2d9d0;border-radius:8px;display:block;background:white;cursor:crosshair;touch-action:none}
+    @media print{#bta{display:none!important}canvas{display:none!important}#fimg{display:block!important}}
+  </style>
+  </head><body>
+  <div class="header">
+    <div><div class="logo">CAR<span>MAR</span></div><div style="font-size:11px;color:#64748b;margin-top:4px">Carlos Martin e Hijos S.A. — Material de Construcción</div></div>
+    <div style="text-align:right">
+      <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px">Comprobante de Entrega</div>
+      <div class="cp-num">${cpId}</div>
+      <div style="font-size:11px;color:#64748b;margin-top:2px">Vale: ${v.id} · ${new Date().toLocaleDateString('es-AR')}</div>
+    </div>
+  </div>
+  <div class="sec"><div class="sec-t">Cliente</div>
+    <b style="font-size:15px">${v.cliente.nombre}</b>
+    <div style="font-size:12px;color:#64748b">${v.cliente.condicion==='contado'?'Contado':'Cuenta Corriente'} · Tel: ${v.cliente.tel}</div>
+    ${v.extra&&v.extra.contraPago?'<div class="contra-pago">⚠ ENTREGA CONTRA PAGO</div>':''}
+  </div>
+  <div class="sec"><div class="sec-t">Factura asociada</div><b>${v.facturaAsociada||'—'}</b> &nbsp;·&nbsp; Depósito: <b>${(v.extra&&v.extra.deposito)||'—'}</b></div>
+  <div class="sec"><div class="sec-t">Detalle de entrega — ${desc}</div>
+    <table>
+      <thead><tr><th>Código</th><th>Descripción</th><th>Cant. entregada</th><th>Depósito</th></tr></thead>
+      <tbody>${artEntregados.map(a=>`<tr><td style="font-family:'Barlow Condensed',sans-serif;font-weight:700">${a.cod||'—'}</td><td>${a.desc}</td><td style="font-weight:700;color:#16a34a;text-align:center">${a.cantEntregadaHoy}</td><td style="font-weight:600">${a.deposito||'—'}</td></tr>`).join('')}</tbody>
+    </table>
+  </div>
+  <div class="banner"><div class="banner-t">Artículos entregados en este acto</div><div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800">${artEntregados.length} artículo(s)</div></div>
+  <div class="sec"><div class="sec-t">Conformidad del cliente — Firma</div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:6px">Dibujá la firma con el mouse o el dedo</div>
+    <canvas id="fcv" width="480" height="100" style="border:1px solid #e2d9d0;border-radius:8px;display:block;background:white;cursor:crosshair;touch-action:none"></canvas>
+    <button onclick="clrFirma()" style="margin-top:5px;background:transparent;color:#64748b;border:1px solid #e2d9d0;padding:4px 12px;border-radius:6px;font-size:12px;cursor:pointer">Limpiar</button>
+    <div id="fimg" style="display:none"><img id="fimgt" style="max-width:480px;border:1px solid #e2d9d0;border-radius:8px"></div>
+  </div>
+  <div class="cond">Comprobante de entrega parcial correspondiente al Vale N° ${v.id} — Carlos Martin e Hijos S.A.<br>El cliente firma en conformidad con los artículos recibidos en este acto.</div>
+  <div style="text-align:center;margin-top:20px" id="bta">
+    <button onclick="prtFirma()" style="background:#1a2744;color:white;border:none;padding:10px 28px;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:600;cursor:pointer;text-transform:uppercase">🖨 Imprimir</button>
+    <button onclick="window.close()" style="background:transparent;color:#64748b;border:1.5px solid #64748b;padding:10px 18px;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-size:14px;cursor:pointer;text-transform:uppercase;margin-left:8px">Cerrar</button>
+  </div>
+  <script>
+  const cv=document.getElementById('fcv'),ctx=cv.getContext('2d');
+  let drw=false,lx=0,ly=0;
+  ctx.strokeStyle='#1a2744';ctx.lineWidth=2;ctx.lineCap='round';ctx.lineJoin='round';
+  function gp(e,c){const r=c.getBoundingClientRect(),t=e.touches?e.touches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};}
+  cv.addEventListener('mousedown',e=>{drw=true;const p=gp(e,cv);lx=p.x;ly=p.y;});
+  cv.addEventListener('mousemove',e=>{if(!drw)return;const p=gp(e,cv);ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(p.x,p.y);ctx.stroke();lx=p.x;ly=p.y;});
+  cv.addEventListener('mouseup',()=>drw=false);cv.addEventListener('mouseleave',()=>drw=false);
+  cv.addEventListener('touchstart',e=>{e.preventDefault();drw=true;const p=gp(e,cv);lx=p.x;ly=p.y;},{passive:false});
+  cv.addEventListener('touchmove',e=>{e.preventDefault();if(!drw)return;const p=gp(e,cv);ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(p.x,p.y);ctx.stroke();lx=p.x;ly=p.y;},{passive:false});
+  cv.addEventListener('touchend',()=>drw=false);
+  function clrFirma(){ctx.clearRect(0,0,cv.width,cv.height);}
+  function prtFirma(){
+    document.getElementById('fimgt').src=cv.toDataURL('image/png');
+    cv.style.display='none';
+    document.querySelector('[onclick="clrFirma()"]').style.display='none';
+    document.getElementById('fimg').style.display='block';
+    document.getElementById('bta').style.display='none';
+    window.print();
+    setTimeout(()=>{cv.style.display='block';document.querySelector('[onclick="clrFirma()"]').style.display='block';document.getElementById('fimg').style.display='none';document.getElementById('bta').style.display='block';},1200);
+  }
+  <\/script>
+  </body></html>`;
+  pw.document.write(html);
+  pw.document.close();
+}
+
+function openCerrarSinRetiro(id){
+  actionValeId=id;
+  document.getElementById('cerrarClave').value='';
+  document.getElementById('cerrarNombre').value='';
+  document.getElementById('cerrarMotivo').value='';
+  document.getElementById('cerrarGenDinero').checked=false;
+  document.getElementById('cerrarErr').style.display='none';
+  openModal('moCerrarSinRetiro');
+}
+
+async function confirmarCerrarSinRetiro(){
+  const clave=document.getElementById('cerrarClave').value.trim();
+  const nombre=document.getElementById('cerrarNombre').value.trim();
+  const motivo=document.getElementById('cerrarMotivo').value.trim();
+  const genDinero=document.getElementById('cerrarGenDinero').checked;
+  if(clave!==authCode){showErr('cerrarErr','Clave de autorización incorrecta');return}
+  if(!nombre){showErr('cerrarErr','Ingresá el nombre de quien autoriza');return}
+  if(!motivo){showErr('cerrarErr','Ingresá el motivo del cierre');return}
+
+  const v=vales.find(x=>x.id===actionValeId);if(!v)return;
+
+  // Calcular saldo de artículos pendientes
+  const artPend=(v.articulos||[]).filter(a=>(a.cantPendiente||0)>0);
+  const importePend=artPend.reduce((s,a)=>s+((a.cantPendiente||0)*a.precio),0);
+
+  v.estado='cerrado';
+  v.historial.push({
+    fecha:new Date().toISOString(),
+    accion:'Vale CERRADO SIN RETIRO COMPLETO — '+motivo,
+    usuario:nombre,
+    saldo:0
+  });
+
+  try{
+    await saveVale(v);
+
+    // Si eligió generar vale por dinero
+    if(genDinero&&importePend>=10000){
+      const newId='V-'+new Date().getFullYear()+'-'+String(vales.length+1).padStart(4,'0');
+      const vDinero={
+        id:newId,tipo:'dinero',
+        cliente:v.cliente,
+        importe:importePend,saldo:importePend,
+        articulos:[],
+        descripcion:`Vale por dinero — cierre de ${v.id} sin retiro completo`,
+        facturaAsociada:v.id,
+        estado:'pendiente',
+        fechaCreacion:new Date().toISOString(),
+        creadoPor:nombre,
+        rolCreador:currentUser.rol,
+        fechaAutorizacion:null,autorizadoPor:null,
+        observaciones:'Generado automáticamente al cerrar '+v.id+' sin retiro total. Ver N/C en Tango.',
+        historial:[{fecha:new Date().toISOString(),accion:'Vale creado (automático por cierre de '+v.id+')',usuario:nombre,saldo:importePend}],
+        extra:{}
+      };
+      await saveVale(vDinero);
+      toast('Vale por dinero '+newId+' creado por $'+fmt(importePend)+'. Pendiente de autorización.','ok');
+    } else if(genDinero&&importePend<10000){
+      toast('El saldo pendiente ($'+fmt(importePend)+') es menor a $10.000, no se genera vale por dinero.','warn');
+    }
+
+    closeModal('moCerrarSinRetiro');
+    toast('Vale '+actionValeId+' cerrado.','warn');
+    verDetalle(actionValeId);
+    renderDash();renderVales();
+  }catch(err){
+    toast('Error: '+err.message,'err');
+  }
 }
 
 // ===== AUTORIZAR =====
@@ -1516,12 +1936,14 @@ function renderDash(){
 function renderVales(){
   let data=[...vales].reverse();
   const cli=document.getElementById('fCliente').value.toLowerCase();
+  const fac=(document.getElementById('fFactura')||{value:''}).value.toLowerCase();
   const est=document.getElementById('fEstado').value;
   const tip=document.getElementById('fTipo').value;
   const fec=document.getElementById('fFecha').value;
-  if(cli)data=data.filter(v=>v.cliente.nombre.toLowerCase().includes(cli));
+  if(cli)data=data.filter(v=>v.cliente.nombre.toLowerCase().includes(cli)||v.id.toLowerCase().includes(cli));
+  if(fac)data=data.filter(v=>(v.facturaAsociada||'').toLowerCase().includes(fac));
   if(est)data=data.filter(v=>v.estado===est);
-  if(tip)data=data.filter(v=>v.tipo.includes(tip));
+  if(tip)data=data.filter(v=>v.tipo===tip||(tip==='mercaderia'&&(v.tipo==='mercaderia'||v.tipo.startsWith('material'))));
   if(fec)data=data.filter(v=>v.fechaCreacion.slice(0,10)>=fec);
   document.getElementById('valesTable').innerHTML=buildTable(data,false);
 }
@@ -1536,14 +1958,15 @@ function buildTable(data,mini){
     <td><a href="#" onclick="verDetalle('${v.id}');return false" style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:var(--orange)">${v.id}</a></td>
     <td><div style="font-weight:500">${v.cliente.nombre}</div><div style="font-size:11px;color:var(--muted)">${v.cliente.tel}</div></td>
     <td>${tipoBadge(v.tipo)}</td>
-    <td style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:600">$${fmt(v.importe)}</td>
-    <td style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:600;color:${v.saldo>0?'var(--green)':'var(--muted)'}">$${fmt(v.saldo)}</td>
-    <td>${estadoBadge(v.estado)}</td>
+    <td style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:600">${(v.tipo==='mercaderia'||v.tipo.startsWith('material'))?(v.articulos&&v.articulos.length?v.articulos.length+' art.':'—'):'$'+fmt(v.importe)}</td>
+    <td style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:600;color:var(--green)">${(v.tipo==='mercaderia'||v.tipo.startsWith('material'))?((v.articulos||[]).filter(a=>(a.cantPendiente||0)>0).length+' pend.'):'$'+fmt(v.saldo)}</td>
+    <td>${estadoBadge(v.estado)}${v.facturaAsociada?`<div style="font-size:10px;color:var(--muted);margin-top:2px">Fac: ${v.facturaAsociada}</div>`:''}</td>
     <td style="font-size:12px;color:var(--muted)">${fmtDate(v.fechaCreacion)}</td>
     ${!mini?`<td style="display:flex;gap:5px;flex-wrap:wrap">
-      ${v.estado==='pendiente'?`<button class="btn btn-sm btn-g" onclick="openAutorizar('${v.id}')">Auth.</button>`:''}
-      ${(v.estado==='autorizado'||v.estado==='parcialmente_usado')?`<button class="btn btn-sm btn-p" onclick="openUsar('${v.id}')">Usar</button>`:''}
-      <button class="btn btn-sm btn-n" onclick="openComp('${v.id}')">Comp.</button>
+      ${v.estado==='pendiente'?`<button class="btn btn-sm btn-g" onclick="openAutorizar('${v.id}')">🔐 Auth.</button>`:''}
+      ${(v.estado==='autorizado'||v.estado==='en_entrega'||v.estado==='parcialmente_usado')&&(v.tipo==='mercaderia'||v.tipo.startsWith('material'))?`<button class="btn btn-sm btn-g" onclick="openEntrega('${v.id}')">📦 Entregar</button>`:''}
+      ${(v.estado==='autorizado'||v.estado==='parcialmente_usado')&&v.tipo!=='mercaderia'&&!v.tipo.startsWith('material')?`<button class="btn btn-sm btn-p" onclick="openUsar('${v.id}')">💳 Usar</button>`:''}
+      <button class="btn btn-sm btn-n" onclick="verDetalle('${v.id}')">🔍 Ver</button>
     </td>`:''}
   </tr>`).join('')}
   </tbody></table>`;
@@ -1675,16 +2098,16 @@ function cambiarPass(){
   const rol=document.getElementById('cfgUsr').value;
   const pass=document.getElementById('cfgUsrPass').value.trim();
   if(!pass||pass.length<3){toast('La contraseña debe tener al menos 3 caracteres','warn');return}
-  const idx=users.findIndex(u=>u.username===rol);
+  const idx=appUsers.findIndex(u=>u.username===rol);
   if(idx<0){toast('Usuario no encontrado','err');return}
-  users[idx].password=pass;save('cm_users',users);
+  appUsers[idx].password=pass;save('cm_users',appUsers);
   fbGuardarConfig();
   document.getElementById('cfgUsrPass').value='';
   toast('Contraseña de '+getRolLabel(rol)+' actualizada','ok');
   renderUserCards();
 }
 function renderUserCards(){
-  document.getElementById('userCards').innerHTML=users.map(u=>`
+  document.getElementById('userCards').innerHTML=appUsers.map(u=>`
     <div class="ucard">
       <div class="un">${u.nombre}</div>
       <div class="ur">${getRolLabel(u.rol)} · usuario: <b>${u.username}</b></div>
@@ -1717,6 +2140,7 @@ function fmtDate(d){if(!d)return'—';const dt=new Date(d);return dt.toLocaleDat
 
 function tipoLabel(t){return{
   dinero:'Vale por Dinero',
+  mercaderia:'Vale por Mercadería',
   material_cc:'Mercadería / C.Cte.',
   material_contado:'Mercadería / Contado',
   // legacy (para vales viejos)
@@ -1727,12 +2151,12 @@ function tipoLabel(t){return{
 }[t]||t}
 
 function tipoBadge(t){
-  const cls=t==='dinero'||t.startsWith('dinero')||t==='cuenta_especial'?'b-din':'b-mat';
+  const cls=(t==='dinero'||t.startsWith('dinero')||t==='cuenta_especial')?'b-din':(t==='mercaderia'||t.startsWith('material'))?'b-mat':'b-mat';
   return`<span class="b ${cls}">${tipoLabel(t)}</span>`}
 
 function estadoBadge(e){
-  const m={pendiente:'b-pend',autorizado:'b-auth',parcialmente_usado:'b-parc',utilizado:'b-used',anulado:'b-anul'};
-  const l={pendiente:'⏳ Pendiente',autorizado:'✔ Autorizado',parcialmente_usado:'💠 Parcial',utilizado:'☑ Utilizado',anulado:'✖ Anulado'};
+  const m={pendiente:'b-pend',autorizado:'b-auth',parcialmente_usado:'b-parc',en_entrega:'b-parc',utilizado:'b-used',completado:'b-auth',cerrado:'b-used',anulado:'b-anul'};
+  const l={pendiente:'⏳ Pendiente',autorizado:'✔ Autorizado',parcialmente_usado:'💠 Parcial',en_entrega:'🚚 En entrega',utilizado:'☑ Utilizado',completado:'✅ Completado',cerrado:'🔒 Cerrado',anulado:'✖ Anulado'};
   return`<span class="b ${m[e]||''}">${l[e]||e}</span>`}
 
 function openModal(id){document.getElementById(id).classList.add('on')}
